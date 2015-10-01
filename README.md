@@ -4,9 +4,9 @@ Common infrastructure services and launch configuration for the Hivebase.io IoT 
 
 - [Infrastructure Services](#infrastructure-services)
   - [Cloud Config](#cloud-config)
-  - [Database](#database-!(mongodb))
-  - [Message Queue](#message-queue-!(rabbitmq))
-  - [Dynamic Reverse Proxy](#dynamic-reverse-proxy-!(vulcand))
+  - [Database](#database)
+  - [Message Queue](#message-queue)
+  - [Dynamic Reverse Proxy](#dynamic-reverse-proxy)
   - [Healthcheck](#healthcheck-service) 
   - [Authentication](#authentication-service)
   - [Email](#email-service)
@@ -32,19 +32,22 @@ The load balancer will rely on the healthcheck app being up before the instances
 
 ***TODO: There are some security group changes needed that aren't yet reflected in the config.***
 
-##Database (mongodb)
+##Database
+###[mongodb](https://hub.docker.com/_/mongo/)
 
 `$ make db-launch`
 
 ***NOTE: Single node config only - for multi-node use separate db cluster or hosted solution e.g. [MongoDB Cloud](https://www.mongodb.com/cloud).***
 
-##Message Queue (rabbitmq)
+##Message Queue
+###[rabbitmq](https://hub.docker.com/_/rabbitmq/)
 
 Hanldes async communication between processes.
 
 `$ make mq-launch`
 
-##Dynamic Reverse Proxy (vulcand)
+##Dynamic Reverse Proxy
+###[vulcand](https://hub.docker.com/r/mailgun/vulcand/)
 
 Allows api service composition and load balancing / failover.
 
