@@ -4,9 +4,9 @@ Common infrastructure services and launch configuration for the Hivebase.io IoT 
 
 - [Infrastructure Services](#infrastructure-services)
   - [Cloud Config](#cloud-config)
-  - [Database](#database-(mongodb))
-  - [Message Queue](#message-queue-(rabbitmq))
-  - [Dynamic Reverse Proxy](#dynamic-reverse-proxy-(vulcand))
+  - [Database](#database-!(mongodb))
+  - [Message Queue](#message-queue-!(rabbitmq))
+  - [Dynamic Reverse Proxy](#dynamic-reverse-proxy-!(vulcand))
   - [Healthcheck](#healthcheck-service) 
   - [Authentication](#authentication-service)
   - [Email](#email-service)
