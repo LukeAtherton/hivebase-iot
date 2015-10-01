@@ -1,0 +1,17 @@
+[Unit]
+Description=Registers rabbit-mq
+BindsTo=rabbit-mq.service
+After=rabbit-mq.service
+
+[Service]
+EnvironmentFile=/etc/environment
+RemainAfterExit=yes
+#wait for rabbit-mq container to start so we can find port
+ExecStartPre=/bin/sleep 15
+ExecStart=/bin/sh -c "/bin/etcdctl set \"/paas/mq/address\" $COREOS_PRIVATE_IPV4:$(docker ps | grep rabbit-mq | awk 'match($0,/[0-9]*->5672/) {print substr($0,RSTART,RLENGTH)}' |  awk -F '->' '{print $1}'); \
+	/bin/etcdctl set \"/paas/mq/username\" 'guest'; \
+	/bin/etcdctl set \"/paas/mq/password\" 'guest';"
+
+[X-Fleet]
+X-ConditionMachineOf=rabbit-mq.service
+X-Conflicts=rabbit-mq-register.service

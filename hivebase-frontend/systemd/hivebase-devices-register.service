@@ -1,0 +1,21 @@
+[Unit]
+Description=Registers Devices Service
+
+Requires=hivebase-devices.service
+BindsTo=hivebase-devices.service
+After=hivebase-devices.service
+
+[Service]
+EnvironmentFile=/etc/environment
+RemainAfterExit=yes
+ExecStartPre=/bin/bash -c "sleep 10s"
+ExecStart=/bin/sh -c "/bin/etcdctl set /vulcand/backends/devices/backend '{\"Type\": \"http\"}'; \
+  export SERVICE_PORT=$(timeout 5s docker ps -a | grep hivebase-devices | awk 'match($0,/[0-9]*->8001/) {print substr($0,RSTART,RLENGTH)}' | awk -F '->' '{print $1}') && \
+  echo Docker Port: $SERVICE_PORT && \
+  /bin/etcdctl set /vulcand/backends/devices/servers/devices '{\"URL\": \"http://${COREOS_PRIVATE_IPV4}:'$SERVICE_PORT'\"}'; \
+  /bin/etcdctl set /vulcand/frontends/devices/frontend '{\"Type\": \"http\", \"BackendId\": \"devices\", \"Route\": \"Host(`hivebase.io`) && PathRegexp(`^/api/devices.*`)\"}';"
+ExecStop=/bin/sh -c "/bin/etcdctl rm /vulcand/backends/devices/servers/devices;"
+
+[X-Fleet]
+X-ConditionMachineOf=hivebase-devices.service
+X-Conflicts=hivebase-devices-register.service

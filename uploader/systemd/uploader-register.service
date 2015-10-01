@@ -1,0 +1,18 @@
+[Unit]
+Description=Registers uploader
+BindsTo=uploader.service
+After=uploader.service
+
+[Service]
+EnvironmentFile=/etc/environment
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "/bin/etcdctl set /vulcand/backends/uploader/backend '{\"Type\": \"http\"}'; \
+  export SERVICE_PORT=$(timeout 5s docker ps -a | grep uploader | awk 'match($0,/[0-9]*->8001/) {print substr($0,RSTART,RLENGTH)}' | awk -F '->' '{print $1}') && \
+  echo Docker Port: $SERVICE_PORT && \
+  /bin/etcdctl set /vulcand/backends/uploader/servers/uploader '{\"URL\": \"http://${COREOS_PRIVATE_IPV4}:'$SERVICE_PORT'\"}'; \
+  /bin/etcdctl set /vulcand/frontends/uploader/frontend '{\"Type\": \"http\", \"BackendId\": \"uploader\", \"Route\": \"Host(`hivebase.io`) && PathRegexp(`^/api/images.*`)\"}';"
+ExecStop=/bin/sh -c "/bin/etcdctl rm /vulcand/backends/uploader/servers/uploader;"
+
+[X-Fleet]
+X-ConditionMachineOf=uploader.service
+X-Conflicts=uploader-register.service

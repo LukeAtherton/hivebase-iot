@@ -1,0 +1,24 @@
+[Unit]
+Description=Healthchecker
+Requires=docker.service
+After=docker.service
+
+[Service]
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+EnvironmentFile=/etc/environment
+
+ExecStartPre=-/usr/bin/docker kill healthchecker
+ExecStartPre=-/usr/bin/docker rm healthchecker
+
+ExecStartPre=/usr/bin/docker pull docker.hivebase.io:5000/healthchecker
+ExecStart=/bin/bash -c "/usr/bin/docker start -a healthchecker || /usr/bin/docker run -p 8888:8001 --rm --name healthchecker docker.hivebase.io:5000/healthchecker"
+ExecStop=/usr/bin/docker stop healthchecker
+
+[X-Fleet]
+X-ConditionMachineMetadata=role=minion
+Global=true

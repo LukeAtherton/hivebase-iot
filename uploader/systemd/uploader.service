@@ -1,0 +1,32 @@
+[Unit]
+Description=Uploader Service
+Requires=docker.service
+After=docker.service
+Requires=uploader-register.service
+Before=uploader-register.service
+
+[Service]
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove work correctly.
+KillMode=none
+
+# Load env variables from coreos
+EnvironmentFile=/etc/environment
+
+# Commands with =- are allowed to fail
+ExecStartPre=-/usr/bin/docker kill uploader
+ExecStartPre=-/usr/bin/docker rm uploader
+
+ExecStartPre=/usr/bin/docker pull docker.hivebase.io:5000/uploader
+ExecStart=/bin/bash -c "/usr/bin/docker start -a uploader \
+	|| /usr/bin/docker run --rm \
+	-P \
+	-e \"HOST_IP=$COREOS_PRIVATE_IPV4\" \
+	--name uploader \
+	docker.hivebase.io:5000/uploader"
+ExecStop=/usr/bin/docker stop uploader
+
+[X-Fleet]
+X-Conflicts=uploader.service
+X-ConditionMachineMetadata=role=minion

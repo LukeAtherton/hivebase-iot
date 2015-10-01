@@ -1,0 +1,30 @@
+[Unit]
+Description=Rabbit MQ
+Requires=docker.service
+After=docker.service
+Requires=rabbit-mq-register.service
+Before=rabbit-mq-register.service
+
+[Service]
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+# Load env variables from coreos
+EnvironmentFile=/etc/environment
+
+# Commands with =- are allowed to fail
+ExecStartPre=-/usr/bin/docker kill rabbit-mq
+ExecStartPre=-/usr/bin/docker rm rabbit-mq
+
+ExecStartPre=/usr/bin/docker pull rabbitmq:3-management 
+#docker.mcacloud.com.au:5000/rabbit-mq
+ExecStart=/bin/bash -c "/usr/bin/docker start -a rabbit-mq || /usr/bin/docker run -e RABBITMQ_NODENAME=mq-master --name rabbit-mq -p 5672:5672 -p 15672:15672 rabbitmq:3-management"
+#-p 25672:25672 -p 4369:4369 -p 44001:44001
+ExecStop=/usr/bin/docker stop rabbit-mq
+
+[X-Fleet]
+X-Conflicts=rabbit-mq.service
+X-ConditionMachineMetadata=role=minion

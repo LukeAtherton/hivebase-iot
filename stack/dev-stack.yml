@@ -1,0 +1,264 @@
+
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Hivebase dev machine - CoreOS on EC2'
+Mappings:
+  RegionMap:
+    ap-northeast-1:
+      AMI: ami-f2338ff2
+    ap-southeast-1:
+      AMI: ami-b6d8d4e4
+    ap-southeast-2:
+      AMI: ami-8f88c8b5
+    eu-central-1:
+      AMI: ami-bececaa3
+    eu-west-1:
+      AMI: ami-0e104179
+    sa-east-1:
+      AMI: ami-11e9600c
+    us-east-1:
+      AMI: ami-3d73d356
+    us-west-1:
+      AMI: ami-1db04f59
+    us-west-2:
+      AMI: ami-85ada4b5
+Parameters:
+  DockerCIDR:
+    Default: 172.24.0.0/16
+    Description: The network CIDR to use with for the docker0 network
+      interface. Fleet uses 192.168/16 internally so your choices are
+      basically 10/8 or 172.16/12. None-VPC AWS uses 10/8 also.
+    Type: String
+  AdvertisedIPAddress:
+    AllowedValues:
+    - private
+    - public
+    Default: private
+    Description: Use 'private' if your etcd cluster is within one region or 'public'
+      if it spans regions or cloud providers.
+    Type: String
+  AllowSSHFrom:
+    Default: 0.0.0.0/0
+    Description: The net block (CIDR) that SSH is available to.
+    Type: String
+  ClusterSize:
+    Default: '1'
+    Description: Number of 'minion' nodes in cluster.
+    MaxValue: '1'
+    MinValue: '1'
+    Type: Number
+  DiscoveryURL:
+    Description: An unique etcd cluster discovery URL. Grab a new token from https://discovery.etcd.io/new
+    Type: String
+  InstanceType:
+    AllowedValues:
+    - m3.medium
+    - m3.large
+    - m3.xlarge
+    - m3.2xlarge
+    - c3.large
+    - c3.xlarge
+    - c3.2xlarge
+    - c3.4xlarge
+    - c3.8xlarge
+    - cc2.8xlarge
+    - cr1.8xlarge
+    - hi1.4xlarge
+    - hs1.8xlarge
+    - i2.xlarge
+    - i2.2xlarge
+    - i2.4xlarge
+    - i2.8xlarge
+    - r3.large
+    - r3.xlarge
+    - r3.2xlarge
+    - r3.4xlarge
+    - r3.8xlarge
+    - t2.micro
+    - t2.small
+    - t2.medium
+    ConstraintDescription: Must be a valid EC2 HVM instance type.
+    Default: m3.medium
+    Description: EC2 instance type (m3.medium, etc).
+    Type: String
+  KeyPair:
+    Description: The name of an EC2 Key Pair to allow SSH access to the instance.
+    Type: String
+Resources:
+  HivebaseInternalIngressTCP:
+    Properties:
+      GroupName:
+        Ref: HivebaseSecurityGroup
+      IpProtocol: tcp
+      FromPort: '0'
+      ToPort: '65535'
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+        - HivebaseSecurityGroup
+        - GroupId
+    Type: AWS::EC2::SecurityGroupIngress
+  HivebaseInternalIngressUDP:
+    Properties:
+      GroupName:
+        Ref: HivebaseSecurityGroup
+      IpProtocol: udp
+      FromPort: '0'
+      ToPort: '65535'
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+        - HivebaseSecurityGroup
+        - GroupId
+    Type: AWS::EC2::SecurityGroupIngress
+  HivebaseWebIngressHTTP:
+    Properties:
+      GroupName:
+        Ref: HivebaseSecurityGroup
+      IpProtocol: tcp
+      FromPort: '80'
+      ToPort: '80'
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+        - HivebaseSecurityGroup
+        - GroupId
+    Type: AWS::EC2::SecurityGroupIngress
+  HivebaseWebIngressSSL:
+    Properties:
+      GroupName:
+        Ref: HivebaseSecurityGroup
+      IpProtocol: tcp
+      FromPort: '443'
+      ToPort: '443'
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+        - HivebaseSecurityGroup
+        - GroupId
+    Type: AWS::EC2::SecurityGroupIngress
+  HivebaseWebIngressHealthcheck:
+    Properties:
+      GroupName:
+        Ref: HivebaseSecurityGroup
+      IpProtocol: tcp
+      FromPort: '8888'
+      ToPort: '8888'
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+        - HivebaseSecurityGroup
+        - GroupId
+    Type: AWS::EC2::SecurityGroupIngress
+  HivebaseSecurityGroup:
+    Properties:
+      GroupDescription: Hivebase CoreOS SecurityGroup
+      SecurityGroupIngress:
+      - CidrIp:
+          Ref: AllowSSHFrom
+        FromPort: '22'
+        IpProtocol: tcp
+        ToPort: '22'
+    Type: AWS::EC2::SecurityGroup
+  HivebaseMasterSecurityGroup:
+    Properties:
+      GroupDescription: Hivebase Master SecurityGroup
+    Type: AWS::EC2::SecurityGroup
+  HivebaseMinionSecurityGroup:
+    Properties:
+      GroupDescription: Hivebase Minion SecurityGroup
+    Type: AWS::EC2::SecurityGroup
+  HivebaseMinionAutoScale:
+    Properties:
+      AvailabilityZones:
+        Fn::GetAZs: ''
+      DesiredCapacity:
+        Ref: ClusterSize
+      LaunchConfigurationName:
+        Ref: HivebaseMasterLaunchConfig
+      LoadBalancerNames: 
+      - Ref: HivebaseLoadBalancer
+      MaxSize: '1'
+      MinSize: '1'
+      Tags:
+      - Key: Name
+        PropagateAtLaunch: true
+        Value:
+          Ref: AWS::StackName
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: '1'
+        MaxBatchSize: '2'
+        WaitOnResourceSignals: true
+        PauseTime: "PT10M"
+    Type: AWS::AutoScaling::AutoScalingGroup
+  HivebaseLoadBalancer:
+    Properties:
+      AvailabilityZones:
+        Fn::GetAZs: ''
+      CrossZone: true
+      Listeners:
+      - LoadBalancerPort: '80'
+        InstancePort: '80'
+        Protocol: HTTP
+      HealthCheck:
+        Target: HTTP:8888/healthcheck
+        HealthyThreshold: 3
+        UnhealthyThreshold: 5
+        Interval: 30
+        Timeout: 5
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+  HivebaseMasterLaunchConfig:
+    Properties:
+      ImageId:
+        Fn::FindInMap:
+        - RegionMap
+        - Ref: AWS::Region
+        - AMI
+      InstanceType:
+        Ref: InstanceType
+      BlockDeviceMappings:
+      - DeviceName: '/dev/xvda'
+        Ebs:
+          VolumeSize: 50
+          VolumeType: 'gp2'
+          DeleteOnTermination: true
+      KeyName:
+        Ref: KeyPair
+      SecurityGroups:
+      - Ref: HivebaseSecurityGroup
+      - Ref: HivebaseMasterSecurityGroup
+      - Ref: HivebaseMinionSecurityGroup
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ""
+          - - ! "#cloud-config\n\n"
+            - ! "coreos:\n"
+            - ! "  etcd2:\n"
+            - ! "    discovery: "
+            - Ref: DiscoveryURL
+            - ! "\n"
+            - ! "    cluster-remove-delay: 300\n"
+            - ! "    advertise-client-urls: http://$"
+            - Ref: AdvertisedIPAddress
+            - ! "_ipv4:2379,http://$"
+            - Ref: AdvertisedIPAddress
+            - ! "_ipv4:4001\n"
+            - ! "    initial-advertise-peer-urls: http://$"
+            - Ref: AdvertisedIPAddress
+            - ! "_ipv4:2380\n"
+            - ! "    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001\n"
+            - ! "    listen-peer-urls: http://$"
+            - Ref: AdvertisedIPAddress
+            - ! "_ipv4:2380,http://$"
+            - Ref: AdvertisedIPAddress
+            - ! "_ipv4:7001\n"
+            - ! "  fleet:\n"
+            - ! "    metadata: role=minion\n"
+            - ! "  units:\n"
+            - ! "    - name: etcd2.service\n"
+            - ! "      command: start\n"
+            - ! "    - name: fleet.socket\n"
+            - ! "      command: start\n"
+            - ! "    - name: fleet.service\n"
+            - ! "      command: start\n"
+            - ! "  update:\n"
+            - ! "    group: stable\n"
+            - ! "    reboot-strategy: off\n"
+    Type: AWS::AutoScaling::LaunchConfiguration

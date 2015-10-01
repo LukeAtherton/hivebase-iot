@@ -1,0 +1,37 @@
+[Unit]
+Description=Registers profiles
+
+Requires=hivebase-profiles.service
+BindsTo=hivebase-profiles.service
+After=hivebase-profiles.service
+
+[Service]
+EnvironmentFile=/etc/environment
+RemainAfterExit=yes
+
+# Start
+## Test whether service is accessible and then register useful information
+#ExecStart=/bin/bash -c '\
+#  while true; do \
+#    curl -f ${COREOS_PUBLIC_IPV4}:80; \
+#    if [ $? -eq 0 ]; then \
+#      etcdctl set /services/apache/${COREOS_PUBLIC_IPV4} \'{"host": "%H", "ipv4_addr": ${COREOS_PUBLIC_IPV4}, "port": 80}\' --ttl 30; \
+#    else \
+#      etcdctl rm /services/apache/${COREOS_PUBLIC_IPV4}; \
+#    fi; \
+#    sleep 20; \
+#  done'
+
+# Stop
+#ExecStop=/usr/bin/etcdctl rm /services/apache/${COREOS_PUBLIC_IPV4}
+
+ExecStart=/bin/sh -c "/bin/etcdctl set /vulcand/backends/profiles/backend '{\"Type\": \"http\"}'; \
+  export SERVICE_PORT=$(timeout 5s docker ps -a | grep hivebase-profiles | awk 'match($0,/[0-9]*->8001/) {print substr($0,RSTART,RLENGTH)}' | awk -F '->' '{print $1}') && \
+  echo Docker Port: $SERVICE_PORT && \
+  /bin/etcdctl set /vulcand/backends/profiles/servers/profiles '{\"URL\": \"http://${COREOS_PRIVATE_IPV4}:'$SERVICE_PORT'\"}'\"}'; \
+  /bin/etcdctl set /vulcand/frontends/profiles/frontend '{\"Type\": \"http\", \"BackendId\": \"profiles\", \"Route\": \"Host(`hivebase.io`) && PathRegexp(`^/api/users.*`)\"}';"
+ExecStop=/bin/sh -c "/bin/etcdctl rm /vulcand/backends/profiles/servers/profiles;"
+
+[X-Fleet]
+X-ConditionMachineOf=hivebase-profiles.service
+X-Conflicts=hivebase-profiles-register.service

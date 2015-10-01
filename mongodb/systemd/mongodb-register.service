@@ -1,0 +1,17 @@
+[Unit]
+Description=Registers mongodb
+BindsTo=mongodb.service
+After=mongodb.service
+
+[Service]
+EnvironmentFile=/etc/environment
+RemainAfterExit=yes
+#wait for rabbit-mq container to start so we can find port
+ExecStartPre=/bin/sleep 15
+ExecStart=/bin/sh -c "/bin/etcdctl set \"/paas/db/address\" $COREOS_PRIVATE_IPV4:$(docker ps | grep mongodb | awk 'match($0,/[0-9]*->27017/) {print substr($0,RSTART,RLENGTH)}' |  awk -F '->' '{print $1}'); \
+	/bin/etcdctl set \"/paas/db/username\" ''; \
+	/bin/etcdctl set \"/paas/db/password\" '';"
+
+[X-Fleet]
+X-ConditionMachineOf=mongodb.service
+X-Conflicts=mongodb-register.service

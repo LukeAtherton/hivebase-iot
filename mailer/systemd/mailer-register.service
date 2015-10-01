@@ -1,0 +1,13 @@
+[Unit]
+Description=Registers Mailer
+BindsTo=mailer.service
+After=mailer.service
+
+[Service]
+EnvironmentFile=/etc/environment
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "/bin/etcdctl set \"/paas/mailer/address\" http://$COREOS_PRIVATE_IPV4; "
+
+[X-Fleet]
+X-ConditionMachineOf=mailer.service
+X-Conflicts=mailer-register.service

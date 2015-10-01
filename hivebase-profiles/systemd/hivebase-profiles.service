@@ -1,0 +1,32 @@
+[Unit]
+Description=Profiles Service
+Requires=docker.service
+After=docker.service
+Requires=hivebase-profiles-register.service
+Before=hivebase-profiles-register.service
+
+[Service]
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove work correctly.
+KillMode=none
+
+# Load env variables from coreos
+EnvironmentFile=/etc/environment
+
+# Commands with =- are allowed to fail
+ExecStartPre=-/usr/bin/docker kill hivebase-profiles
+ExecStartPre=-/usr/bin/docker rm hivebase-profiles
+
+ExecStartPre=/usr/bin/docker pull docker.hivebase.io:5000/hivebase-profiles
+ExecStart=/bin/bash -c "/usr/bin/docker start -a hivebase-profiles \
+	|| /usr/bin/docker run --rm \
+	-P \
+	-e \"HOST_IP=$COREOS_PRIVATE_IPV4\" \
+	--name hivebase-profiles \
+	docker.hivebase.io:5000/hivebase-profiles"
+ExecStop=/usr/bin/docker stop hivebase-profiles
+
+[X-Fleet]
+X-Conflicts=hivebase-profiles.service
+X-ConditionMachineMetadata=role=minion
